@@ -4,12 +4,27 @@ A powerful Model Context Protocol (MCP) server that provides **intelligent trip 
 
 ## 🚀 Quick Start
 
-### Install and Run
+### Installation Methods
+
+#### Option 1: NPX (Recommended)
 ```bash
-npx olamap-mcp-server
+npx -y olamap-mcp-server@latest
 ```
 
-### Configure Claude Desktop
+#### Option 2: Global Installation
+```bash
+npm install -g olamap-mcp-server@latest
+olamap-mcp-server
+```
+
+#### Option 3: UVX (Python Package Manager)
+```bash
+uvx olamap-mcp-server@latest
+```
+
+### Configuration Examples
+
+#### Claude Desktop
 Add to your Claude Desktop configuration:
 
 **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`  
@@ -20,11 +35,79 @@ Add to your Claude Desktop configuration:
   "mcpServers": {
     "olamap": {
       "command": "npx",
-      "args": ["olamap-mcp-server"],
+      "args": ["-y", "olamap-mcp-server@latest"],
       "env": {
         "OLAMAP_API_KEY": "your_olamap_api_key_here"
       }
     }
+  }
+}
+```
+
+#### n8n MCP Integration
+```json
+{
+  "command": "npx",
+  "args": ["-y", "olamap-mcp-server@latest"],
+  "env": {
+    "OLAMAP_API_KEY": "your_olamap_api_key_here"
+  }
+}
+```
+
+#### Kiro IDE
+```json
+{
+  "mcpServers": {
+    "olamap": {
+      "command": "npx",
+      "args": ["-y", "olamap-mcp-server@latest"],
+      "env": {
+        "OLAMAP_API_KEY": "your_olamap_api_key_here"
+      },
+      "autoApprove": [
+        "olamap_autocomplete",
+        "olamap_place_details",
+        "olamap_nearby_search",
+        "olamap_text_search",
+        "olamap_geocode",
+        "olamap_reverse_geocode"
+      ]
+    }
+  }
+}
+```
+
+#### Alternative Configurations
+
+**Using Global Installation:**
+```json
+{
+  "command": "olamap-mcp-server",
+  "env": {
+    "OLAMAP_API_KEY": "your_olamap_api_key_here"
+  }
+}
+```
+
+**Using Node Directly:**
+```json
+{
+  "command": "node",
+  "args": ["/path/to/olamap-mcp-server/dist/index.js"],
+  "env": {
+    "OLAMAP_API_KEY": "your_olamap_api_key_here"
+  }
+}
+```
+
+**Using UVX:**
+```json
+{
+  "command": "uvx",
+  "args": ["olamap-mcp-server@latest"],
+  "env": {
+    "OLAMAP_API_KEY": "your_olamap_api_key_here"
   }
 }
 ```
@@ -252,3 +335,45 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 **Built with ❤️ for the MCP community**  
 *Enabling AI agents to handle complex, real-world location planning scenarios*
+##
+ 🔧 Troubleshooting
+
+### Common Issues
+
+#### "Connection closed" Error
+- **Cause**: Missing or invalid API key
+- **Solution**: Ensure `OLAMAP_API_KEY` environment variable is set with a valid key
+
+#### Windows NPX Permission Issues
+- **Cause**: Windows file permission problems with npm cache
+- **Solutions**:
+  1. Use global installation: `npm install -g olamap-mcp-server@latest`
+  2. Use node directly: `node /path/to/dist/index.js`
+  3. Run as administrator
+
+#### Module Not Found Errors
+- **Cause**: Package installation issues
+- **Solution**: Clear npm cache and reinstall:
+  ```bash
+  npm cache clean --force
+  npx -y olamap-mcp-server@latest
+  ```
+
+#### TypeScript Compilation Errors
+- **Cause**: Missing TypeScript during installation
+- **Solution**: Use the published package instead of building from source
+
+### Testing Your Installation
+
+```bash
+# Test with a simple API key
+OLAMAP_API_KEY=your_key npx -y olamap-mcp-server@latest
+
+# Should output: "OlaMap MCP Server running on stdio"
+```
+
+### Supported Platforms
+
+- **Node.js**: 18.0.0 or higher
+- **Operating Systems**: Windows, macOS, Linux
+- **MCP Clients**: Claude Desktop, n8n, Kiro IDE, and any MCP-compatible client
