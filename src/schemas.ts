@@ -153,4 +153,94 @@ export type MultipleElevationArgs = z.infer<typeof MultipleElevationArgsSchema>;
 export type StyleConfigArgs = z.infer<typeof StyleConfigArgsSchema>;
 export type TripPlannerArgs = z.infer<typeof TripPlannerArgsSchema>;
 export type LocationFinderArgs = z.infer<typeof LocationFinderArgsSchema>;
+export const DirectionsArgsSchema = z.object({
+  origin: z.string().min(1, 'Origin is required'),
+  destination: z.string().min(1, 'Destination is required'),
+  waypoints: z.array(z.string()).optional(),
+  mode: z.string().optional().default('driving'),
+  alternatives: z.boolean().optional().default(false),
+  avoid: z.string().optional(),
+  units: z.string().optional().default('metric')
+});
+
+export const PhotoArgsSchema = z.object({
+  photo_reference: z.string().min(1, 'Photo reference is required'),
+  maxWidth: z.number().optional(),
+  maxHeight: z.number().optional()
+});
+
+export const SearchAlongRouteArgsSchema = z.object({
+  origin: z.string().min(1, 'Origin is required'),
+  destination: z.string().min(1, 'Destination is required'),
+  query: z.string().min(1, 'Search query is required'),
+  radius: z.number().optional(),
+  types: z.string().optional()
+});
+
+export const RouteOptimizerAdvancedArgsSchema = z.object({
+  locations: z.array(z.string()).min(2, 'At least two locations are required'),
+  roundTrip: z.boolean().optional().default(false),
+  mode: z.string().optional().default('driving'),
+  startLocation: z.string().optional(),
+  endLocation: z.string().optional()
+});
+
+export const ShowMapHtmlArgsSchema = z.object({
+  route_polyline: z.string().min(1, 'Route polyline is required'),
+  origin: z.string().min(1, 'Origin is required'),
+  destination: z.string().min(1, 'Destination is required'),
+  waypoints: z.array(z.string()).optional(),
+  zoom: z.number().optional().default(12),
+  width: z.number().optional().default(800),
+  height: z.number().optional().default(600)
+});
+
+export const ShowMarkersMapHtmlArgsSchema = z.object({
+  markers: z.array(z.object({
+    lat: z.number(),
+    lng: z.number(),
+    title: z.string(),
+    description: z.string().optional()
+  })).min(1, 'At least one marker is required'),
+  center: z.object({
+    lat: z.number(),
+    lng: z.number()
+  }).optional(),
+  zoom: z.number().optional().default(12),
+  width: z.number().optional().default(800),
+  height: z.number().optional().default(600),
+  showRoute: z.boolean().optional().default(false)
+});
+
+export const ShowActualRouteMapArgsSchema = z.object({
+  origin: z.string().min(1, 'Origin is required'),
+  destination: z.string().min(1, 'Destination is required'),
+  waypoints: z.array(z.string()).optional(),
+  mode: z.string().optional().default('driving'),
+  zoom: z.number().optional().default(12),
+  width: z.number().optional().default(800),
+  height: z.number().optional().default(600)
+});
+
+export const SequentialRouteMapArgsSchema = z.object({
+  points: z.array(z.object({
+    lat: z.number(),
+    lng: z.number(),
+    name: z.string()
+  })).min(2, 'At least 2 points are required'),
+  mode: z.string().optional().default('driving'),
+  optimize: z.boolean().optional().default(true),
+  zoom: z.number().optional().default(12),
+  width: z.number().optional().default(900),
+  height: z.number().optional().default(700)
+});
+
+export type DirectionsArgs = z.infer<typeof DirectionsArgsSchema>;
+export type PhotoArgs = z.infer<typeof PhotoArgsSchema>;
+export type SearchAlongRouteArgs = z.infer<typeof SearchAlongRouteArgsSchema>;
+export type RouteOptimizerAdvancedArgs = z.infer<typeof RouteOptimizerAdvancedArgsSchema>;
+export type ShowMapHtmlArgs = z.infer<typeof ShowMapHtmlArgsSchema>;
+export type ShowMarkersMapHtmlArgs = z.infer<typeof ShowMarkersMapHtmlArgsSchema>;
+export type ShowActualRouteMapArgs = z.infer<typeof ShowActualRouteMapArgsSchema>;
+export type SequentialRouteMapArgs = z.infer<typeof SequentialRouteMapArgsSchema>;
 export type RouteOptimizerArgs = z.infer<typeof RouteOptimizerArgsSchema>;

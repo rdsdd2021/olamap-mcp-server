@@ -35,7 +35,15 @@ import {
   StyleConfigArgsSchema,
   TripPlannerArgsSchema,
   LocationFinderArgsSchema,
-  RouteOptimizerArgsSchema
+  RouteOptimizerArgsSchema,
+  DirectionsArgsSchema,
+  PhotoArgsSchema,
+  SearchAlongRouteArgsSchema,
+  RouteOptimizerAdvancedArgsSchema,
+  ShowMapHtmlArgsSchema,
+  ShowMarkersMapHtmlArgsSchema,
+  ShowActualRouteMapArgsSchema,
+  SequentialRouteMapArgsSchema
 } from './schemas.js';
 
 const server = new Server(
@@ -474,6 +482,181 @@ const tools: Tool[] = [
       },
       required: ['locations']
     }
+  },
+  {
+    name: 'olamap_get_directions',
+    description: 'Provides routable path between two or more points',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        origin: { type: 'string', description: 'Starting point as coordinates "lat,lng" or address' },
+        destination: { type: 'string', description: 'Ending point as coordinates "lat,lng" or address' },
+        waypoints: { 
+          type: 'array', 
+          items: { type: 'string' },
+          description: 'Optional waypoints as coordinates or addresses'
+        },
+        mode: { type: 'string', description: 'Travel mode (driving, walking, cycling)', default: 'driving' },
+        alternatives: { type: 'boolean', description: 'Return alternative routes', default: false },
+        avoid: { type: 'string', description: 'Avoid tolls, highways, ferries' },
+        units: { type: 'string', description: 'Unit system (metric, imperial)', default: 'metric' }
+      },
+      required: ['origin', 'destination']
+    }
+  },
+  {
+    name: 'olamap_get_photo',
+    description: 'Fetches a photo URL & metadata from a photo reference',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        photo_reference: { type: 'string', description: 'Photo reference from place details' },
+        maxWidth: { type: 'number', description: 'Maximum width of the photo' },
+        maxHeight: { type: 'number', description: 'Maximum height of the photo' }
+      },
+      required: ['photo_reference']
+    }
+  },
+  {
+    name: 'olamap_search_along_route',
+    description: 'Searches for POIs along a specified route',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        origin: { type: 'string', description: 'Route starting point as coordinates "lat,lng" or address' },
+        destination: { type: 'string', description: 'Route ending point as coordinates "lat,lng" or address' },
+        query: { type: 'string', description: 'Search query for POIs (e.g., "gas station", "restaurant")' },
+        radius: { type: 'number', description: 'Search radius in meters from route', default: 5000 },
+        types: { type: 'string', description: 'Place types filter (restaurant, gas_station, etc.)' }
+      },
+      required: ['origin', 'destination', 'query']
+    }
+  },
+  {
+    name: 'olamap_get_route_optimizer',
+    description: 'Similar to olamap_optimize_route, but includes more specific optional params like round_trip, mode',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        locations: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of location coordinates as ["lat,lng", ...]'
+        },
+        roundTrip: { type: 'boolean', description: 'Return to starting location', default: false },
+        mode: { type: 'string', description: 'Travel mode (driving, walking, cycling)', default: 'driving' },
+        startLocation: { type: 'string', description: 'Starting location coordinates "lat,lng"' },
+        endLocation: { type: 'string', description: 'Ending location coordinates "lat,lng"' }
+      },
+      required: ['locations']
+    }
+  },
+  {
+    name: 'olamap_show_map_html_for_route',
+    description: 'Returns HTML for an interactive map with a polyline',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        route_polyline: { type: 'string', description: 'Encoded polyline string from directions API' },
+        origin: { type: 'string', description: 'Starting point coordinates "lat,lng"' },
+        destination: { type: 'string', description: 'Ending point coordinates "lat,lng"' },
+        waypoints: { 
+          type: 'array', 
+          items: { type: 'string' },
+          description: 'Optional waypoints coordinates'
+        },
+        zoom: { type: 'number', description: 'Map zoom level', default: 12 },
+        width: { type: 'number', description: 'Map width in pixels', default: 800 },
+        height: { type: 'number', description: 'Map height in pixels', default: 600 }
+      },
+      required: ['route_polyline', 'origin', 'destination']
+    }
+  },
+  {
+    name: 'olamap_show_actual_route_map',
+    description: 'Generate HTML map with actual routed path using OlaMap directions API',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        origin: { type: 'string', description: 'Starting point coordinates "lat,lng" or address' },
+        destination: { type: 'string', description: 'Ending point coordinates "lat,lng" or address' },
+        waypoints: { 
+          type: 'array', 
+          items: { type: 'string' },
+          description: 'Optional waypoints coordinates or addresses'
+        },
+        mode: { type: 'string', description: 'Travel mode (driving, walking, cycling)', default: 'driving' },
+        zoom: { type: 'number', description: 'Map zoom level', default: 12 },
+        width: { type: 'number', description: 'Map width in pixels', default: 800 },
+        height: { type: 'number', description: 'Map height in pixels', default: 600 }
+      },
+      required: ['origin', 'destination']
+    }
+  },
+  {
+    name: 'olamap_sequential_route_map',
+    description: 'Generate optimized sequential route map with point-to-point routing (A→B→C→D)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        points: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              lat: { type: 'number', description: 'Latitude' },
+              lng: { type: 'number', description: 'Longitude' },
+              name: { type: 'string', description: 'Location name' }
+            },
+            required: ['lat', 'lng', 'name']
+          },
+          description: 'Array of points to visit in sequence',
+          minItems: 2
+        },
+        mode: { type: 'string', description: 'Travel mode (driving, walking, cycling)', default: 'driving' },
+        optimize: { type: 'boolean', description: 'Optimize point order for shortest route', default: true },
+        zoom: { type: 'number', description: 'Map zoom level', default: 12 },
+        width: { type: 'number', description: 'Map width in pixels', default: 900 },
+        height: { type: 'number', description: 'Map height in pixels', default: 700 }
+      },
+      required: ['points']
+    }
+  },
+  {
+    name: 'olamap_show_markers_map_html',
+    description: 'Returns HTML for a map with markers and popups, optionally connected by routes',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        markers: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              lat: { type: 'number', description: 'Marker latitude' },
+              lng: { type: 'number', description: 'Marker longitude' },
+              title: { type: 'string', description: 'Marker title' },
+              description: { type: 'string', description: 'Marker popup description' }
+            },
+            required: ['lat', 'lng', 'title']
+          },
+          description: 'Array of markers to display'
+        },
+        center: {
+          type: 'object',
+          properties: {
+            lat: { type: 'number' },
+            lng: { type: 'number' }
+          },
+          description: 'Map center coordinates (optional, auto-calculated if not provided)'
+        },
+        zoom: { type: 'number', description: 'Map zoom level', default: 12 },
+        width: { type: 'number', description: 'Map width in pixels', default: 800 },
+        height: { type: 'number', description: 'Map height in pixels', default: 600 },
+        showRoute: { type: 'boolean', description: 'Connect markers with route lines', default: false }
+      },
+      required: ['markers']
+    }
   }
 ];
 
@@ -893,6 +1076,174 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: 'text',
               text: JSON.stringify(optimizedRoute, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_get_directions': {
+        const parsed = DirectionsArgsSchema.parse(args);
+        const result = await olaMapClient.getDirections(
+          parsed.origin,
+          parsed.destination,
+          parsed.waypoints,
+          {
+            mode: parsed.mode,
+            alternatives: parsed.alternatives,
+            avoid: parsed.avoid,
+            units: parsed.units
+          }
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_get_photo': {
+        const parsed = PhotoArgsSchema.parse(args);
+        const result = await olaMapClient.getPhoto(parsed.photo_reference, {
+          maxWidth: parsed.maxWidth,
+          maxHeight: parsed.maxHeight
+        });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_search_along_route': {
+        const parsed = SearchAlongRouteArgsSchema.parse(args);
+        const result = await olaMapClient.searchAlongRoute(
+          parsed.origin,
+          parsed.destination,
+          parsed.query,
+          {
+            radius: parsed.radius,
+            types: parsed.types
+          }
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_get_route_optimizer': {
+        const parsed = RouteOptimizerAdvancedArgsSchema.parse(args);
+        const result = await olaMapClient.getRouteOptimizer(parsed.locations, {
+          roundTrip: parsed.roundTrip,
+          mode: parsed.mode,
+          startLocation: parsed.startLocation,
+          endLocation: parsed.endLocation
+        });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_show_map_html_for_route': {
+        const parsed = ShowMapHtmlArgsSchema.parse(args);
+        const html = olaMapClient.generateRouteMapHtml(
+          parsed.route_polyline,
+          parsed.origin,
+          parsed.destination,
+          parsed.waypoints,
+          {
+            zoom: parsed.zoom,
+            width: parsed.width,
+            height: parsed.height
+          }
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: html
+            }
+          ]
+        };
+      }
+
+      case 'olamap_show_markers_map_html': {
+        const parsed = ShowMarkersMapHtmlArgsSchema.parse(args);
+        const html = olaMapClient.generateMarkersMapHtml(
+          parsed.markers,
+          parsed.center,
+          {
+            zoom: parsed.zoom,
+            width: parsed.width,
+            height: parsed.height,
+            showRoute: parsed.showRoute
+          }
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: html
+            }
+          ]
+        };
+      }
+
+      case 'olamap_show_actual_route_map': {
+        const parsed = ShowActualRouteMapArgsSchema.parse(args);
+        const html = await olaMapClient.generateRouteMapWithDirections(
+          parsed.origin,
+          parsed.destination,
+          parsed.waypoints,
+          {
+            zoom: parsed.zoom,
+            width: parsed.width,
+            height: parsed.height,
+            mode: parsed.mode
+          }
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: html
+            }
+          ]
+        };
+      }
+
+      case 'olamap_sequential_route_map': {
+        const parsed = SequentialRouteMapArgsSchema.parse(args);
+        const html = await olaMapClient.generateSequentialRouteMap(
+          parsed.points,
+          {
+            zoom: parsed.zoom,
+            width: parsed.width,
+            height: parsed.height,
+            mode: parsed.mode,
+            optimize: parsed.optimize
+          }
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: html
             }
           ]
         };
