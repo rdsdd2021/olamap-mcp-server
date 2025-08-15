@@ -32,11 +32,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/olamap-mcp-server.git"
+    "url": "git+https://github.com/rdsdd2021/olamap-mcp-server.git"
   },
-  "homepage": "https://github.com/your-username/olamap-mcp-server#readme",
+  "homepage": "https://github.com/rdsdd2021/olamap-mcp-server#readme",
   "bugs": {
-    "url": "https://github.com/your-username/olamap-mcp-server/issues"
+    "url": "https://github.com/rdsdd2021/olamap-mcp-server/issues"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
