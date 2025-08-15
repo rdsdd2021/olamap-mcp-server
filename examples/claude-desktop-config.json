@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "olamap": {
+      "command": "npx",
+      "args": ["olamap-mcp-server"],
+      "env": {
+        "OLAMAP_API_KEY": "your_olamap_api_key_here"
+      }
+    }
+  }
+}

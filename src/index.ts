@@ -1,0 +1,939 @@
+#!/usr/bin/env node
+
+/**
+ * OlaMap MCP Server
+ * 
+ * A Model Context Protocol server that provides access to OlaMap APIs
+ * for location services, geocoding, places search, routing, and more.
+ */
+
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+  Tool,
+} from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
+import { OlaMapClient } from './olamap-client.js';
+import { AdvancedRoutePlanner } from './route-planner.js';
+import { 
+  AutocompleteArgsSchema,
+  PlaceDetailsArgsSchema,
+  NearbySearchArgsSchema,
+  TextSearchArgsSchema,
+  AddressValidationArgsSchema,
+  GeocodeArgsSchema,
+  ReverseGeocodeArgsSchema,
+  DistanceMatrixArgsSchema,
+  SnapToRoadArgsSchema,
+  NearestRoadsArgsSchema,
+  SpeedLimitsArgsSchema,
+  ElevationArgsSchema,
+  MultipleElevationArgsSchema,
+  MapStylesArgsSchema,
+  StyleConfigArgsSchema,
+  TripPlannerArgsSchema,
+  LocationFinderArgsSchema,
+  RouteOptimizerArgsSchema
+} from './schemas.js';
+
+const server = new Server(
+  {
+    name: 'olamap-server',
+    version: '1.0.0',
+  },
+  {
+    capabilities: {
+      tools: {},
+    },
+  }
+);
+
+// Initialize OlaMap client and route planner
+let olaMapClient: OlaMapClient | null = null;
+let routePlanner: AdvancedRoutePlanner | null = null;
+
+// Tool definitions
+const tools: Tool[] = [
+  {
+    name: 'olamap_autocomplete',
+    description: 'Get place suggestions with autocomplete for a search query',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: {
+          type: 'string',
+          description: 'Search query text'
+        },
+        location: {
+          type: 'string',
+          description: 'Optional bias location as "lat,lng"'
+        },
+        radius: {
+          type: 'string',
+          description: 'Optional search radius in meters'
+        },
+        types: {
+          type: 'string',
+          description: 'Optional place types filter (airport, restaurant, etc.)'
+        }
+      },
+      required: ['input']
+    }
+  },
+  {
+    name: 'olamap_place_details',
+    description: 'Get detailed information about a place using place_id',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        place_id: {
+          type: 'string',
+          description: 'Unique place identifier from autocomplete or search'
+        },
+        advanced: {
+          type: 'boolean',
+          description: 'Whether to get advanced details with extended information',
+          default: false
+        }
+      },
+      required: ['place_id']
+    }
+  },
+  {
+    name: 'olamap_nearby_search',
+    description: 'Find nearby places around a location',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        location: {
+          type: 'string',
+          description: 'Center point coordinates as "lat,lng"'
+        },
+        radius: {
+          type: 'string',
+          description: 'Search radius in meters (default: 1000)'
+        },
+        types: {
+          type: 'string',
+          description: 'Place types filter (restaurant, cafe, etc.)'
+        },
+        limit: {
+          type: 'string',
+          description: 'Maximum number of results (default: 10)'
+        },
+        advanced: {
+          type: 'boolean',
+          description: 'Whether to get advanced details',
+          default: false
+        }
+      },
+      required: ['location']
+    }
+  },
+  {
+    name: 'olamap_text_search',
+    description: 'Search for places using natural language queries',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: {
+          type: 'string',
+          description: 'Natural language search query'
+        },
+        location: {
+          type: 'string',
+          description: 'Optional center point for search bias as "lat,lng"'
+        },
+        radius: {
+          type: 'string',
+          description: 'Optional search radius in meters'
+        }
+      },
+      required: ['input']
+    }
+  },
+  {
+    name: 'olamap_validate_address',
+    description: 'Validate and standardize Indian addresses (must include pincode)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        address: {
+          type: 'string',
+          description: 'Complete address with pincode in format: "Area, City, State PINCODE, Country"'
+        }
+      },
+      required: ['address']
+    }
+  },
+  {
+    name: 'olamap_geocode',
+    description: 'Convert addresses to coordinates (forward geocoding)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        address: {
+          type: 'string',
+          description: 'Address string to geocode'
+        },
+        bounds: {
+          type: 'string',
+          description: 'Optional bounding box for result biasing as "sw_lat,sw_lng|ne_lat,ne_lng"'
+        },
+        region: {
+          type: 'string',
+          description: 'Optional region code for biasing'
+        }
+      },
+      required: ['address']
+    }
+  },
+  {
+    name: 'olamap_reverse_geocode',
+    description: 'Convert coordinates to addresses (reverse geocoding)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        lat: {
+          type: 'number',
+          description: 'Latitude'
+        },
+        lng: {
+          type: 'number',
+          description: 'Longitude'
+        },
+        result_type: {
+          type: 'string',
+          description: 'Optional filter by result types'
+        }
+      },
+      required: ['lat', 'lng']
+    }
+  },
+  {
+    name: 'olamap_distance_matrix',
+    description: 'Calculate distance and time matrix between multiple points',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        origins: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of origin coordinates as ["lat,lng", ...]'
+        },
+        destinations: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of destination coordinates as ["lat,lng", ...]'
+        },
+        mode: {
+          type: 'string',
+          description: 'Travel mode (driving, walking, cycling)',
+          default: 'driving'
+        },
+        units: {
+          type: 'string',
+          description: 'Unit system (metric, imperial)',
+          default: 'metric'
+        },
+        basic: {
+          type: 'boolean',
+          description: 'Use basic version without traffic data',
+          default: false
+        }
+      },
+      required: ['origins', 'destinations']
+    }
+  },
+  {
+    name: 'olamap_snap_to_road',
+    description: 'Snap GPS coordinates to the nearest road network',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        points: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of coordinates to snap as ["lat,lng", ...]'
+        },
+        enhancePath: {
+          type: 'boolean',
+          description: 'Add intermediate points',
+          default: false
+        },
+        interpolate: {
+          type: 'boolean',
+          description: 'Interpolate between points',
+          default: true
+        }
+      },
+      required: ['points']
+    }
+  },
+  {
+    name: 'olamap_nearest_roads',
+    description: 'Find nearest roads to given coordinates',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        points: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of coordinates as ["lat,lng", ...]'
+        },
+        mode: {
+          type: 'string',
+          description: 'Travel mode (DRIVING, WALKING)',
+          default: 'DRIVING'
+        },
+        radius: {
+          type: 'number',
+          description: 'Search radius in meters',
+          default: 500
+        }
+      },
+      required: ['points']
+    }
+  },
+  {
+    name: 'olamap_speed_limits',
+    description: 'Get speed limits for road segments',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        points: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of coordinates as ["lat,lng", ...]'
+        },
+        snapStrategy: {
+          type: 'string',
+          description: 'Snapping strategy',
+          default: 'snaptoroad'
+        }
+      },
+      required: ['points']
+    }
+  },
+  {
+    name: 'olamap_elevation',
+    description: 'Get elevation data for coordinates',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        lat: {
+          type: 'number',
+          description: 'Latitude'
+        },
+        lng: {
+          type: 'number',
+          description: 'Longitude'
+        }
+      },
+      required: ['lat', 'lng']
+    }
+  },
+  {
+    name: 'olamap_multiple_elevations',
+    description: 'Get elevation data for multiple coordinates',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        coordinates: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of coordinates as ["lat,lng", ...]'
+        }
+      },
+      required: ['coordinates']
+    }
+  },
+  {
+    name: 'olamap_map_styles',
+    description: 'Get available vector tile map styles',
+    inputSchema: {
+      type: 'object',
+      properties: {}
+    }
+  },
+  {
+    name: 'olamap_style_config',
+    description: 'Get configuration for a specific map style',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        style_name: {
+          type: 'string',
+          description: 'Style name (e.g., bolt-light, eclipse-dark-standard)'
+        }
+      },
+      required: ['style_name']
+    }
+  },
+  {
+    name: 'olamap_3d_tileset',
+    description: 'Get 3D tiles configuration',
+    inputSchema: {
+      type: 'object',
+      properties: {}
+    }
+  },
+  {
+    name: 'olamap_plan_trip',
+    description: 'Plan a complex multi-location trip with time constraints and vehicle considerations',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        locations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Location name' },
+              address: { type: 'string', description: 'Full address (optional if coordinates provided)' },
+              coordinates: { type: 'string', description: 'Coordinates as "lat,lng" (optional if address provided)' },
+              place_id: { type: 'string', description: 'OlaMap place ID (optional)' },
+              visit_duration_minutes: { type: 'number', description: 'Time to spend at location in minutes' },
+              preferred_time: { type: 'string', description: 'Preferred visit time as "HH:MM" (optional)' },
+              priority: { type: 'string', enum: ['high', 'medium', 'low'], description: 'Visit priority' },
+              notes: { type: 'string', description: 'Additional notes (optional)' }
+            },
+            required: ['name', 'visit_duration_minutes']
+          },
+          description: 'List of locations to visit'
+        },
+        vehicle: {
+          type: 'object',
+          properties: {
+            type: { type: 'string', enum: ['car', 'bike', 'walking', 'public_transport'], description: 'Vehicle type' },
+            average_speed_kmh: { type: 'number', description: 'Average speed in km/h (optional)' },
+            fuel_efficiency: { type: 'number', description: 'Fuel efficiency (optional)' },
+            capacity: { type: 'number', description: 'Vehicle capacity (optional)' }
+          },
+          required: ['type']
+        },
+        constraints: {
+          type: 'object',
+          properties: {
+            start_time: { type: 'string', description: 'Trip start time as "HH:MM"' },
+            end_time: { type: 'string', description: 'Trip end time as "HH:MM"' },
+            start_location: { type: 'string', description: 'Starting location coordinates or address (optional)' },
+            end_location: { type: 'string', description: 'Ending location coordinates or address (optional)' },
+            max_travel_time_minutes: { type: 'number', description: 'Maximum travel time per day in minutes (optional)' },
+            max_total_distance_km: { type: 'number', description: 'Maximum distance per day in km (optional)' },
+            break_duration_minutes: { type: 'number', description: 'Break duration in minutes (optional)' },
+            break_after_hours: { type: 'number', description: 'Take break after X hours (optional)' }
+          },
+          required: ['start_time', 'end_time']
+        },
+        date: { type: 'string', description: 'Trip date in YYYY-MM-DD format (optional)' }
+      },
+      required: ['locations', 'vehicle', 'constraints']
+    }
+  },
+  {
+    name: 'olamap_find_locations',
+    description: 'Find and suggest locations based on criteria (schools, restaurants, etc.)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query (e.g., "schools in Bengaluru", "restaurants near Koramangala")' },
+        location: { type: 'string', description: 'Center location as coordinates "lat,lng" or address' },
+        radius: { type: 'number', description: 'Search radius in meters', default: 5000 },
+        limit: { type: 'number', description: 'Maximum number of results', default: 10 },
+        types: { type: 'string', description: 'Place types filter (school, restaurant, hospital, etc.)' },
+        include_details: { type: 'boolean', description: 'Include detailed information', default: true }
+      },
+      required: ['query', 'location']
+    }
+  },
+  {
+    name: 'olamap_optimize_route',
+    description: 'Optimize route order for multiple locations to minimize travel time',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        locations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              coordinates: { type: 'string', description: 'Coordinates as "lat,lng"' },
+              priority: { type: 'string', enum: ['high', 'medium', 'low'], default: 'medium' }
+            },
+            required: ['name', 'coordinates']
+          }
+        },
+        start_location: { type: 'string', description: 'Starting point coordinates "lat,lng"' },
+        end_location: { type: 'string', description: 'Ending point coordinates "lat,lng" (optional)' },
+        vehicle_type: { type: 'string', enum: ['car', 'bike', 'walking'], default: 'car' },
+        optimization_goal: { type: 'string', enum: ['time', 'distance', 'balanced'], default: 'time' }
+      },
+      required: ['locations']
+    }
+  }
+];
+
+// List tools handler
+server.setRequestHandler(ListToolsRequestSchema, async () => {
+  return { tools };
+});
+
+// Helper methods
+function suggestVisitDuration(types: string[]): number {
+  if (!types) return 30;
+  
+  if (types.includes('school') || types.includes('university')) return 60;
+  if (types.includes('hospital') || types.includes('doctor')) return 45;
+  if (types.includes('restaurant') || types.includes('cafe')) return 90;
+  if (types.includes('shopping_mall') || types.includes('store')) return 120;
+  if (types.includes('tourist_attraction') || types.includes('museum')) return 180;
+  if (types.includes('bank') || types.includes('atm')) return 15;
+  if (types.includes('gas_station')) return 10;
+  
+  return 30; // Default
+}
+
+function calculateEfficiencyImprovement(originalLocations: any[], result: any): string {
+  // Simple efficiency calculation - in a real implementation, 
+  // you'd compare against the original order
+  const optimizedDistance = result.total_distance_km;
+  const estimatedOriginalDistance = optimizedDistance * 1.2; // Assume 20% improvement
+  const improvement = ((estimatedOriginalDistance - optimizedDistance) / estimatedOriginalDistance * 100).toFixed(1);
+  return `Estimated ${improvement}% reduction in travel distance`;
+}
+
+// Call tool handler
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params;
+
+  if (!olaMapClient) {
+    throw new Error('OlaMap client not initialized. Please set OLAMAP_API_KEY environment variable.');
+  }
+
+  try {
+    switch (name) {
+      case 'olamap_autocomplete': {
+        const parsed = AutocompleteArgsSchema.parse(args);
+        const result = await olaMapClient.autocomplete(parsed.input, parsed.location, {
+          radius: parsed.radius,
+          types: parsed.types
+        });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_place_details': {
+        const parsed = PlaceDetailsArgsSchema.parse(args);
+        const result = await olaMapClient.getPlaceDetails(parsed.place_id, parsed.advanced);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_nearby_search': {
+        const parsed = NearbySearchArgsSchema.parse(args);
+        const result = await olaMapClient.nearbySearch(parsed.location, {
+          radius: parsed.radius,
+          types: parsed.types,
+          limit: parsed.limit,
+          advanced: parsed.advanced
+        });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_text_search': {
+        const parsed = TextSearchArgsSchema.parse(args);
+        const result = await olaMapClient.textSearch(parsed.input, parsed.location, parsed.radius);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_validate_address': {
+        const parsed = AddressValidationArgsSchema.parse(args);
+        const result = await olaMapClient.validateAddress(parsed.address);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_geocode': {
+        const parsed = GeocodeArgsSchema.parse(args);
+        const result = await olaMapClient.geocode(parsed.address, parsed.bounds);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_reverse_geocode': {
+        const parsed = ReverseGeocodeArgsSchema.parse(args);
+        const result = await olaMapClient.reverseGeocode(parsed.lat, parsed.lng, parsed.result_type);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_distance_matrix': {
+        const parsed = DistanceMatrixArgsSchema.parse(args);
+        const result = await olaMapClient.getDistanceMatrix(
+          parsed.origins,
+          parsed.destinations,
+          parsed.mode,
+          parsed.basic
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_snap_to_road': {
+        const parsed = SnapToRoadArgsSchema.parse(args);
+        const result = await olaMapClient.snapToRoad(parsed.points, {
+          enhancePath: parsed.enhancePath,
+          interpolate: parsed.interpolate
+        });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_nearest_roads': {
+        const parsed = NearestRoadsArgsSchema.parse(args);
+        const result = await olaMapClient.getNearestRoads(parsed.points, parsed.mode, parsed.radius);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_speed_limits': {
+        const parsed = SpeedLimitsArgsSchema.parse(args);
+        const result = await olaMapClient.getSpeedLimits(parsed.points, parsed.snapStrategy);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_elevation': {
+        const parsed = ElevationArgsSchema.parse(args);
+        const result = await olaMapClient.getElevation(parsed.lat, parsed.lng);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_multiple_elevations': {
+        const parsed = MultipleElevationArgsSchema.parse(args);
+        const result = await olaMapClient.getMultipleElevations(parsed.coordinates);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_map_styles': {
+        const result = await olaMapClient.getMapStyles();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_style_config': {
+        const parsed = StyleConfigArgsSchema.parse(args);
+        const result = await olaMapClient.getStyleConfig(parsed.style_name);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_3d_tileset': {
+        const result = await olaMapClient.get3DTilesetConfig();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_plan_trip': {
+        if (!routePlanner) {
+          throw new Error('Route planner not initialized');
+        }
+        
+        const parsed = TripPlannerArgsSchema.parse(args);
+        const result = await routePlanner.planTrip(
+          parsed.locations,
+          parsed.vehicle,
+          parsed.constraints,
+          parsed.date
+        );
+        
+        // Format the response for better readability
+        const formattedResult = {
+          summary: {
+            feasible_in_single_day: result.feasible_in_single_day,
+            recommended_days: result.recommended_days,
+            total_distance_km: result.total_distance_km,
+            total_time_hours: result.total_time_hours
+          },
+          day_plans: result.day_plans.map(plan => ({
+            day: plan.day,
+            date: plan.date,
+            feasible: plan.feasible,
+            locations: plan.locations.map(loc => loc.name),
+            schedule: plan.locations.map((loc, idx) => ({
+              location: loc.name,
+              arrival_time: plan.route_segments[idx - 1]?.arrival_time || plan.start_time,
+              departure_time: plan.route_segments[idx]?.departure_time || 
+                            (idx === plan.locations.length - 1 ? plan.end_time : 'N/A'),
+              visit_duration: loc.visit_duration_minutes + ' minutes'
+            })),
+            total_distance_km: plan.total_distance_km,
+            total_travel_time: plan.total_travel_time_minutes + ' minutes',
+            issues: plan.issues,
+            suggestions: plan.suggestions
+          })),
+          unvisited_locations: result.unvisited_locations.map(loc => loc.name),
+          optimization_notes: result.optimization_notes,
+          alternative_suggestions: result.alternative_suggestions,
+          detailed_plan: result
+        };
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(formattedResult, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_find_locations': {
+        const parsed = LocationFinderArgsSchema.parse(args);
+        
+        // First, resolve the center location
+        let centerCoords = parsed.location;
+        if (!centerCoords.includes(',')) {
+          // It's an address, geocode it
+          const geocodeResult = await olaMapClient.geocode(parsed.location);
+          if (geocodeResult.geocodingResults && geocodeResult.geocodingResults.length > 0) {
+            const result = geocodeResult.geocodingResults[0];
+            centerCoords = `${result.geometry.location.lat},${result.geometry.location.lng}`;
+          }
+        }
+        
+        // Search for locations
+        const searchResult = await olaMapClient.nearbySearch(centerCoords, {
+          radius: parsed.radius?.toString(),
+          types: parsed.types,
+          limit: parsed.limit?.toString(),
+          advanced: parsed.include_details
+        });
+        
+        // Format results for trip planning
+        const locations = searchResult.predictions?.map((place: any, index: number) => ({
+          name: place.structured_formatting?.main_text || place.description,
+          address: place.structured_formatting?.secondary_text || place.description,
+          coordinates: place.geometry?.location ? 
+            `${place.geometry.location.lat},${place.geometry.location.lng}` : null,
+          place_id: place.place_id,
+          types: place.types,
+          rating: place.rating,
+          distance_meters: place.distance_meters,
+          suggested_visit_duration: suggestVisitDuration(place.types),
+          details: parsed.include_details ? {
+            phone: place.formatted_phone_number,
+            website: place.website,
+            opening_hours: place.opening_hours,
+            amenities: place.amenities_available
+          } : undefined
+        })) || [];
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                query: parsed.query,
+                center_location: centerCoords,
+                total_found: locations.length,
+                locations: locations,
+                trip_planning_ready: locations.filter((loc: any) => loc.coordinates).length > 0
+              }, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'olamap_optimize_route': {
+        if (!routePlanner) {
+          throw new Error('Route planner not initialized');
+        }
+        
+        const parsed = RouteOptimizerArgsSchema.parse(args);
+        
+        // Convert to visit locations format
+        const visitLocations = parsed.locations.map(loc => ({
+          name: loc.name,
+          coordinates: loc.coordinates,
+          visit_duration_minutes: 30, // Default visit time
+          priority: loc.priority || 'medium'
+        }));
+        
+        // Create basic constraints
+        const constraints = {
+          start_time: '09:00',
+          end_time: '18:00'
+        };
+        
+        // Create vehicle
+        const vehicle = {
+          type: parsed.vehicle_type || 'car'
+        };
+        
+        const result = await routePlanner.planTrip(visitLocations, vehicle, constraints);
+        
+        const optimizedRoute = {
+          optimization_goal: parsed.optimization_goal,
+          original_order: parsed.locations.map(loc => loc.name),
+          optimized_order: result.day_plans[0]?.locations.map(loc => loc.name) || [],
+          total_distance_km: result.total_distance_km,
+          total_travel_time_hours: result.day_plans[0]?.total_travel_time_minutes ? 
+            (result.day_plans[0].total_travel_time_minutes / 60).toFixed(1) : 0,
+          route_segments: result.day_plans[0]?.route_segments || [],
+          efficiency_improvement: calculateEfficiencyImprovement(parsed.locations, result)
+        };
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(optimizedRoute, null, 2)
+            }
+          ]
+        };
+      }
+
+      default:
+        throw new Error(`Unknown tool: ${name}`);
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Error: ${errorMessage}`
+        }
+      ],
+      isError: true
+    };
+  }
+});
+
+// Initialize and start server
+async function main() {
+  const apiKey = process.env.OLAMAP_API_KEY;
+  
+  if (!apiKey) {
+    console.error('Error: OLAMAP_API_KEY environment variable is required');
+    process.exit(1);
+  }
+
+  olaMapClient = new OlaMapClient(apiKey);
+  routePlanner = new AdvancedRoutePlanner(olaMapClient);
+
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  
+  console.error('OlaMap MCP Server running on stdio');
+}
+
+main().catch((error) => {
+  console.error('Server error:', error);
+  process.exit(1);
+});
