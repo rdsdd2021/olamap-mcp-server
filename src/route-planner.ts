@@ -6,7 +6,16 @@
  */
 
 import { OlaMapClient } from './olamap-client.js';
-import { Location, DistanceMatrixElement } from './types.js';
+// Simple type definitions
+export interface Location {
+  lat: number;
+  lng: number;
+}
+
+export interface DistanceMatrixElement {
+  distance: number;
+  duration: number;
+}
 
 export interface VisitLocation {
   name: string;
@@ -125,7 +134,7 @@ export class AdvancedRoutePlanner {
             coordinates = `${result.geometry.location.lat},${result.geometry.location.lng}`;
           }
         } catch (error) {
-          console.warn(`Failed to geocode address: ${location.address}`);
+          // Failed to geocode address
         }
       }
       
@@ -138,7 +147,7 @@ export class AdvancedRoutePlanner {
             coordinates = `${loc.lat},${loc.lng}`;
           }
         } catch (error) {
-          console.warn(`Failed to get place details for: ${location.place_id}`);
+          // Failed to get place details
         }
       }
       

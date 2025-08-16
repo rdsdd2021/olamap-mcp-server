@@ -1,0 +1,494 @@
+{
+  "olamap_advanced_templates": {
+    "street_level_routing": {
+      "name": "Street-Level Route Planning",
+      "description": "Generate actual road routes with turn-by-turn directions (not straight lines)",
+      "template": {
+        "tool": "mcp_olamap_local_olamap_get_directions",
+        "parameters": {
+          "origin": "{{start_coordinates_or_address}}",
+          "destination": "{{end_coordinates_or_address}}",
+          "mode": "driving",
+          "alternatives": true,
+          "waypoints": "{{intermediate_stops}}"
+        }
+      },
+      "post_processing": {
+        "decode_polyline": true,
+        "extract_street_names": true,
+        "generate_turn_markers": true,
+        "create_interactive_map": true
+      },
+      "example": {
+        "start_coordinates_or_address": "26.6849,88.4426",
+        "end_coordinates_or_address": "26.7388,88.4342",
+        "intermediate_stops": ["26.7247,88.3951"]
+      }
+    },
+
+    "multi_city_route_planner": {
+      "name": "Multi-City Route Optimization",
+      "description": "Plan optimal routes across multiple cities with real street navigation",
+      "workflow": [
+        {
+          "step": 1,
+          "action": "validate_all_locations",
+          "tool": "mcp_olamap_local_olamap_geocode",
+          "description": "Validate and geocode all city locations"
+        },
+        {
+          "step": 2,
+          "action": "optimize_city_order",
+          "tool": "mcp_olamap_local_olamap_optimize_route",
+          "description": "Optimize the order of city visits"
+        },
+        {
+          "step": 3,
+          "action": "generate_inter_city_routes",
+          "tool": "mcp_olamap_local_olamap_get_directions",
+          "description": "Get detailed directions between each city"
+        },
+        {
+          "step": 4,
+          "action": "create_comprehensive_map",
+          "tool": "mcp_olamap_local_olamap_sequential_route_map",
+          "description": "Create interactive map with all routes"
+        }
+      ],
+      "example": {
+        "cities": [
+          {"name": "Delhi", "coordinates": "28.6139,77.2090"},
+          {"name": "Agra", "coordinates": "27.1767,78.0081"},
+          {"name": "Jaipur", "coordinates": "26.9124,75.7873"}
+        ]
+      }
+    },
+
+    "business_territory_mapping": {
+      "name": "Business Territory Route Mapping",
+      "description": "Map business territories with optimized client visit routes",
+      "template": {
+        "territory_analysis": {
+          "tool": "mcp_olamap_local_olamap_nearby_search",
+          "parameters": {
+            "location": "{{territory_center}}",
+            "radius": "{{coverage_radius}}",
+            "types": "{{business_types}}",
+            "advanced": true
+          }
+        },
+        "route_optimization": {
+          "tool": "mcp_olamap_local_olamap_plan_trip",
+          "parameters": {
+            "locations": "{{client_locations}}",
+            "vehicle": {"type": "car", "average_speed_kmh": 35},
+            "constraints": {
+              "start_time": "09:00",
+              "end_time": "17:00",
+              "max_travel_time_minutes": 360
+            }
+          }
+        }
+      },
+      "example": {
+        "territory_center": "12.9716,77.5946",
+        "coverage_radius": "10000",
+        "business_types": "office,bank,restaurant",
+        "client_locations": [
+          {"name": "Client A", "coordinates": "12.9352,77.6245", "visit_duration_minutes": 60},
+          {"name": "Client B", "coordinates": "12.9719,77.6412", "visit_duration_minutes": 45}
+        ]
+      }
+    },
+
+    "event_logistics_coordinator": {
+      "name": "Event Logistics Route Coordination",
+      "description": "Coordinate complex event logistics with multiple venues and suppliers",
+      "phases": {
+        "venue_analysis": {
+          "tool": "mcp_olamap_local_olamap_find_locations",
+          "parameters": {
+            "query": "{{venue_type}} in {{city}}",
+            "location": "{{city_center}}",
+            "include_details": true
+          }
+        },
+        "supplier_mapping": {
+          "tool": "mcp_olamap_local_olamap_search_along_route",
+          "parameters": {
+            "origin": "{{main_venue}}",
+            "destination": "{{secondary_venue}}",
+            "query": "{{supplier_services}}",
+            "radius": 5000
+          }
+        },
+        "logistics_optimization": {
+          "tool": "mcp_olamap_local_olamap_optimize_route",
+          "parameters": {
+            "locations": "{{all_event_locations}}",
+            "optimization_goal": "time",
+            "vehicle_type": "car"
+          }
+        }
+      },
+      "example": {
+        "venue_type": "banquet halls",
+        "city": "Mumbai",
+        "city_center": "19.0760,72.8777",
+        "supplier_services": "catering,flowers,photography"
+      }
+    },
+
+    "emergency_response_network": {
+      "name": "Emergency Response Route Network",
+      "description": "Create emergency response networks with fastest route calculations",
+      "priority_levels": {
+        "critical": {
+          "response_time_target": 8,
+          "route_options": 3,
+          "traffic_override": true
+        },
+        "high": {
+          "response_time_target": 15,
+          "route_options": 2,
+          "traffic_override": false
+        },
+        "medium": {
+          "response_time_target": 30,
+          "route_options": 1,
+          "traffic_override": false
+        }
+      },
+      "template": {
+        "find_nearest_services": {
+          "tool": "mcp_olamap_local_olamap_nearby_search",
+          "parameters": {
+            "location": "{{emergency_location}}",
+            "types": "{{service_type}}",
+            "radius": "15000",
+            "advanced": true
+          }
+        },
+        "calculate_response_routes": {
+          "tool": "mcp_olamap_local_olamap_get_directions",
+          "parameters": {
+            "origin": "{{service_location}}",
+            "destination": "{{emergency_location}}",
+            "mode": "driving",
+            "alternatives": true
+          }
+        }
+      },
+      "example": {
+        "emergency_location": "28.6139,77.2090",
+        "service_type": "hospital,police,fire_station"
+      }
+    },
+
+    "food_delivery_optimization": {
+      "name": "Food Delivery Route Optimization",
+      "description": "Optimize food delivery routes with time constraints and vehicle capacity",
+      "constraints": {
+        "delivery_time_window": 30,
+        "max_orders_per_trip": 5,
+        "vehicle_capacity": "thermal_bag_limits",
+        "restaurant_pickup_time": 5
+      },
+      "workflow": [
+        {
+          "step": 1,
+          "action": "cluster_orders_by_area",
+          "tool": "mcp_olamap_local_olamap_nearby_search",
+          "description": "Group orders by geographical proximity"
+        },
+        {
+          "step": 2,
+          "action": "optimize_pickup_sequence",
+          "tool": "mcp_olamap_local_olamap_optimize_route",
+          "description": "Optimize restaurant pickup order"
+        },
+        {
+          "step": 3,
+          "action": "optimize_delivery_sequence",
+          "tool": "mcp_olamap_local_olamap_plan_trip",
+          "description": "Optimize customer delivery sequence with time windows"
+        },
+        {
+          "step": 4,
+          "action": "generate_driver_navigation",
+          "tool": "mcp_olamap_local_olamap_show_actual_route_map",
+          "description": "Create turn-by-turn navigation for drivers"
+        }
+      ],
+      "example": {
+        "restaurant_hub": "12.9716,77.5946",
+        "delivery_orders": [
+          {"customer": "Customer A", "address": "12.9352,77.6245", "prep_time": 15},
+          {"customer": "Customer B", "address": "12.9719,77.6412", "prep_time": 20}
+        ]
+      }
+    },
+
+    "real_estate_location_scorer": {
+      "name": "Real Estate Location Scoring System",
+      "description": "Comprehensive location analysis for real estate investment decisions",
+      "scoring_criteria": {
+        "connectivity": {
+          "weight": 25,
+          "factors": ["public_transport", "major_roads", "airports"]
+        },
+        "amenities": {
+          "weight": 30,
+          "factors": ["schools", "hospitals", "shopping", "parks"]
+        },
+        "infrastructure": {
+          "weight": 20,
+          "factors": ["utilities", "internet", "waste_management"]
+        },
+        "growth_potential": {
+          "weight": 15,
+          "factors": ["planned_developments", "government_projects"]
+        },
+        "safety": {
+          "weight": 10,
+          "factors": ["crime_rates", "police_stations", "lighting"]
+        }
+      },
+      "analysis_workflow": [
+        {
+          "step": 1,
+          "action": "validate_property_location",
+          "tool": "mcp_olamap_local_olamap_validate_address"
+        },
+        {
+          "step": 2,
+          "action": "analyze_nearby_amenities",
+          "tool": "mcp_olamap_local_olamap_nearby_search",
+          "radius_tiers": [500, 1000, 2000, 5000]
+        },
+        {
+          "step": 3,
+          "action": "calculate_commute_times",
+          "tool": "mcp_olamap_local_olamap_distance_matrix",
+          "destinations": ["business_districts", "airports", "schools"]
+        },
+        {
+          "step": 4,
+          "action": "generate_location_report",
+          "tool": "mcp_olamap_local_olamap_show_markers_map_html",
+          "include": ["amenities", "transport", "scores"]
+        }
+      ]
+    },
+
+    "tourist_trail_generator": {
+      "name": "Tourist Trail Generator",
+      "description": "Generate themed tourist trails with cultural and historical significance",
+      "trail_themes": {
+        "heritage": {
+          "poi_types": ["monument", "museum", "historical_site", "temple"],
+          "walking_preference": true,
+          "photo_stops": "high_priority"
+        },
+        "food": {
+          "poi_types": ["restaurant", "street_food", "market", "cafe"],
+          "timing_consideration": "meal_hours",
+          "local_specialties": true
+        },
+        "nature": {
+          "poi_types": ["park", "garden", "lake", "viewpoint"],
+          "weather_dependent": true,
+          "physical_activity": "moderate"
+        },
+        "shopping": {
+          "poi_types": ["market", "mall", "boutique", "handicrafts"],
+          "budget_consideration": true,
+          "bargaining_culture": true
+        }
+      },
+      "template": {
+        "discover_attractions": {
+          "tool": "mcp_olamap_local_olamap_find_locations",
+          "parameters": {
+            "query": "{{theme}} attractions in {{city}}",
+            "location": "{{city_center}}",
+            "limit": 20
+          }
+        },
+        "create_themed_route": {
+          "tool": "mcp_olamap_local_olamap_plan_trip",
+          "parameters": {
+            "locations": "{{selected_attractions}}",
+            "constraints": {
+              "start_time": "{{preferred_start}}",
+              "end_time": "{{preferred_end}}"
+            }
+          }
+        }
+      }
+    },
+
+    "logistics_fleet_manager": {
+      "name": "Fleet Management Route Optimizer",
+      "description": "Manage multiple vehicle fleets with different capabilities and constraints",
+      "vehicle_profiles": {
+        "small_delivery_van": {
+          "capacity_kg": 500,
+          "fuel_efficiency": 12,
+          "restricted_areas": ["narrow_lanes"],
+          "speed_profile": "urban"
+        },
+        "large_truck": {
+          "capacity_kg": 5000,
+          "fuel_efficiency": 6,
+          "restricted_areas": ["residential", "low_bridges"],
+          "speed_profile": "highway_preferred"
+        },
+        "motorcycle": {
+          "capacity_kg": 20,
+          "fuel_efficiency": 40,
+          "restricted_areas": [],
+          "speed_profile": "traffic_agile"
+        }
+      },
+      "optimization_workflow": [
+        {
+          "step": 1,
+          "action": "analyze_delivery_requirements",
+          "description": "Match deliveries to appropriate vehicle types"
+        },
+        {
+          "step": 2,
+          "action": "optimize_vehicle_routes",
+          "tool": "mcp_olamap_local_olamap_optimize_route",
+          "description": "Create optimal routes for each vehicle"
+        },
+        {
+          "step": 3,
+          "action": "calculate_fuel_costs",
+          "description": "Estimate fuel consumption and costs"
+        },
+        {
+          "step": 4,
+          "action": "generate_driver_instructions",
+          "tool": "mcp_olamap_local_olamap_get_directions",
+          "description": "Provide turn-by-turn navigation for each driver"
+        }
+      ]
+    }
+  },
+
+  "creative_use_cases": {
+    "movie_location_scouting": {
+      "name": "Movie Location Scouting Routes",
+      "description": "Plan efficient routes for movie location scouting with specific requirements",
+      "requirements": {
+        "scenic_value": "high",
+        "accessibility": "vehicle_and_equipment",
+        "permits_required": "check_local_authorities",
+        "lighting_conditions": "time_of_day_dependent"
+      }
+    },
+    
+    "archaeological_survey_routes": {
+      "name": "Archaeological Survey Route Planning",
+      "description": "Plan systematic archaeological survey routes with GPS precision",
+      "methodology": {
+        "grid_system": "systematic_coverage",
+        "elevation_consideration": true,
+        "historical_maps_overlay": true,
+        "access_permissions": "required"
+      }
+    },
+
+    "wildlife_photography_trails": {
+      "name": "Wildlife Photography Trail Planning",
+      "description": "Plan wildlife photography routes based on animal behavior and seasons",
+      "considerations": {
+        "seasonal_migration": true,
+        "feeding_times": "dawn_dusk",
+        "weather_conditions": "critical",
+        "equipment_transport": "specialized_vehicles"
+      }
+    },
+
+    "disaster_relief_coordination": {
+      "name": "Disaster Relief Route Coordination",
+      "description": "Coordinate disaster relief efforts with multiple agencies and resources",
+      "priorities": {
+        "life_safety": "highest",
+        "medical_supplies": "critical",
+        "food_water": "essential",
+        "shelter_materials": "important"
+      }
+    },
+
+    "cultural_heritage_preservation": {
+      "name": "Cultural Heritage Site Documentation Routes",
+      "description": "Plan routes for documenting and preserving cultural heritage sites",
+      "documentation_types": {
+        "photogrammetry": "high_resolution_required",
+        "3d_scanning": "equipment_intensive",
+        "oral_history": "community_engagement",
+        "artifact_cataloging": "systematic_approach"
+      }
+    }
+  },
+
+  "integration_templates": {
+    "weather_aware_routing": {
+      "name": "Weather-Aware Route Planning",
+      "description": "Integrate weather data for safer and more efficient routing",
+      "weather_factors": {
+        "rain": "avoid_flood_prone_areas",
+        "fog": "prefer_well_lit_routes",
+        "extreme_heat": "minimize_exposure_time",
+        "storms": "seek_shelter_options"
+      }
+    },
+
+    "fuel_price_optimized_routing": {
+      "name": "Fuel Price Optimized Routing",
+      "description": "Plan routes considering real-time fuel prices and vehicle efficiency",
+      "optimization_factors": {
+        "fuel_stations": "price_comparison",
+        "route_efficiency": "distance_vs_traffic",
+        "vehicle_type": "fuel_consumption_profile",
+        "bulk_discounts": "fleet_considerations"
+      }
+    },
+
+    "traffic_prediction_routing": {
+      "name": "AI-Powered Traffic Prediction Routing",
+      "description": "Use machine learning to predict traffic patterns and optimize routes",
+      "prediction_models": {
+        "historical_patterns": "day_of_week_time_of_day",
+        "event_impact": "concerts_sports_festivals",
+        "weather_correlation": "rain_snow_impact",
+        "construction_schedules": "planned_road_work"
+      }
+    }
+  },
+
+  "template_metadata": {
+    "version": "3.0.0",
+    "created": "2024-01-15",
+    "last_updated": "2024-01-15",
+    "total_templates": 15,
+    "complexity_levels": ["basic", "intermediate", "advanced", "expert"],
+    "supported_regions": ["India", "Global"],
+    "api_compatibility": "OlaMap API v2.0+",
+    "features": [
+      "Street-level routing with real road networks",
+      "Advanced route optimization algorithms",
+      "Multi-modal transport support",
+      "Real-time traffic integration",
+      "Interactive map visualization",
+      "Custom business logic integration",
+      "Weather and external data integration",
+      "Fleet management capabilities",
+      "Emergency response optimization",
+      "Cultural and tourism applications"
+    ]
+  }
+}

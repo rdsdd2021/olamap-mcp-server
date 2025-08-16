@@ -1,13 +1,51 @@
 {
     "mcpServers": {
-        "olamap": {
-            "command": "npx",
+        "olamap-local": {
+            "command": "node",
             "args": [
-                "-y",
-                "olamap-mcp-server"
+                "C:\\Users\\Ramanuj Dey Sarkar\\Desktop\\OlaMaps MCP\\dist\\index.js"
             ],
             "env": {
                 "OLAMAP_API_KEY": "your-olamap-api-key-here"
+            },
+            "disabled": false,
+            "autoApprove": [
+                "olamap_text_search",
+                "olamap_nearby_search",
+                "olamap_geocode",
+                "olamap_reverse_geocode",
+                "olamap_get_directions",
+                "olamap_distance_matrix",
+                "olamap_elevation",
+                "olamap_map_styles",
+                "olamap_validate_address",
+                "olamap_snap_to_road",
+                "olamap_plan_trip",
+                "olamap_optimize_route",
+                "olamap_show_markers_map_html",
+                "olamap_sequential_route_map",
+                "olamap_find_locations",
+                "olamap_multiple_elevations",
+                "olamap_show_actual_route_map",
+                "olamap_nearest_roads",
+                "olamap_speed_limits",
+                "olamap_get_route_optimizer",
+                "olamap_3d_tileset",
+                "olamap_style_config",
+                "olamap_show_map_html_for_route",
+                "olamap_search_along_route",
+                "olamap_get_photo",
+                "olamap_autocomplete",
+                "olamap_place_details"
+            ]
+        },
+        "postman-api-mcp": {
+            "command": "node",
+            "args": [
+                "postman-mcp-server/dist/src/index.js"
+            ],
+            "env": {
+                "POSTMAN_API_KEY": "your-postman-api-key-here"
             },
             "disabled": false,
             "autoApprove": []
